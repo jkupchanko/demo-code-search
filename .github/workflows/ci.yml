@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # The API functions and the frontend are typechecked separately: they have
+      # different tsconfigs, and the API's has no DOM-heavy React types in it.
+      - name: Install API dev deps
+        run: npm install
+      - name: Typecheck API
+        run: npm run typecheck
+      - name: Test API
+        run: npm test
+      - name: Install frontend
+        run: npm --prefix frontend ci
+      - name: Typecheck and build frontend
+        run: npm --prefix frontend run build
+      - name: Lint frontend
+        run: npm --prefix frontend run lint
+
+  # The bench scripts are stdlib-only on purpose; this catches a syntax error
+  # before someone discovers it four hours into an indexing run.
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile
+        run: python -m compileall -q bench indexer

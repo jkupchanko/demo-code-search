@@ -53,7 +53,7 @@ export function CustomHeader() {
             Work?
           </Title>
           <Text className={classes.subHeading}>
-            This demo runs semantic search over the Qdrant codebase.
+            This demo runs hybrid search over the Qdrant codebase.
           </Text>
           <Text className={classes.description}>
             When you search a codebase, you usually want one of two things:
@@ -65,7 +65,7 @@ export function CustomHeader() {
             <Image src="/workflow.svg" alt="Diagram of the two-model search workflow" />
           </Box>
           <Text className={classes.description}>
-            MiniLM reads the description, UniXcoder reads the code itself.
+            mxbai reads the description, BM25 reads the identifiers.
             Combining them finds the relevant method and, where both agree, the
             exact lines inside it.
           </Text>

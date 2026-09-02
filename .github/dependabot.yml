@@ -1,7 +1,12 @@
+# No pip or docker ecosystems here: the indexer and the benchmarks are stdlib,
+# and there is no container to keep patched. What is left is npm in two places
+# and the actions.
 version: 2
 updates:
-  - package-ecosystem: "pip"
-    directory: "/"
+  - package-ecosystem: "npm"
+    directories:
+      - "/"
+      - "/frontend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -17,11 +22,6 @@ updates:
           - "patch"
         patterns:
           - "*"
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

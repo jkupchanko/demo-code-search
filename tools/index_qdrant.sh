@@ -1,26 +1,30 @@
 #!/usr/bin/env bash
+#
+# Build the corpus from a checkout of qdrant/qdrant and load it into Qdrant.
+#
+# The embedding happens inside the cluster, so nothing here installs a model.
+# The slow parts are rust-analyzer's LSIF pass and the rust-parser container,
+# which is where most of the wall clock goes.
 
 set -e
 
-QDRANT_PATH=$1
+QDRANT_PATH=$(realpath "$1")
 
-QDRANT_PATH=$(realpath $QDRANT_PATH)
-
-# Get path to this script
 SCRIPT_PATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 ROOT_PATH=$SCRIPT_PATH/..
 
+export QDRANT_PATH
 
-python -m code_search.index.files_to_json
+# Whole .rs files, for the file viewer.
+python "$ROOT_PATH/indexer/prepare/files_to_json.py"
 
-python -m code_search.index.file_uploader
+# Folding ranges -> code snippets.
+rustup run stable rust-analyzer -v lsif "$QDRANT_PATH" > "$ROOT_PATH/data/index.lsif"
+python "$ROOT_PATH/indexer/prepare/convert_lsif_index.py"
 
-rustup run stable rust-analyzer -v lsif $QDRANT_PATH > $ROOT_PATH/data/index.lsif
+# Function and struct signatures with their docstrings.
+docker run --rm -v "$QDRANT_PATH":/source qdrant/rust-parser ./rust_parser /source \
+  > "$ROOT_PATH/data/structures.json"
 
-python -m code_search.index.convert_lsif_index
-
-python -m code_search.index.upload_code
-
-docker run --rm -v $QDRANT_PATH:/source qdrant/rust-parser ./rust_parser /source > $ROOT_PATH/data/structures.json
-
-python -m code_search.index.upload_signatures
+# One pass, three collections, every vector computed by Qdrant Cloud Inference.
+python "$ROOT_PATH/indexer/build.py" --source files --fresh

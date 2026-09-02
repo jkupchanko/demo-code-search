@@ -1,0 +1,14 @@
+{
+  "name": "demo-code-search-cloud",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build",
+    "typecheck": "tsc --noEmit",
+    "test": "esbuild api/_lib/merge.ts --format=esm --outfile=.test-build/merge.mjs && node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@vercel/node": "^5.3.24",
+    "typescript": "^5.6.3"
+  }
+}

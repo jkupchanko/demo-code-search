@@ -1,76 +1,100 @@
-# Code search with Qdrant
+# Code Search with Qdrant
 
-Developers need a code search tool that helps them find the right piece of code. In this README, we describe how
-you can set up a tool that provides code results, in context.
+Developers need a code search tool that helps them find the right piece of code.
+This repository is that tool, built on [Qdrant](https://qdrant.tech), searching
+the [Qdrant source](https://github.com/qdrant/qdrant), and deployed as two
+things: a Vercel project and a Qdrant Cloud cluster.
 
-## Online version
+It is a rebuild of [qdrant/demo-code-search](https://github.com/qdrant/demo-code-search).
+The interface is the same. What changed is everything behind it, and
+[why](#why-this-was-rebuilt) is the interesting part.
 
-See our code search tool "in action." Navigate to 
-**[https://code-search.qdrant.tech/](https://code-search.qdrant.tech/)**. We've prepopulated the demo with Qdrant 
-codebase. You can see the results, in context, even with relatively vague search terms.
+## Online Version
 
-The refreshed build in this repository is deployed at
-**[https://demo-code-search-production.up.railway.app](https://demo-code-search-production.up.railway.app)**,
-serving both the frontend and the API from one container. Until
-`code-search.qdrant.tech` is pointed at it, the two run side by side against
-separate Qdrant clusters — see [DEPLOY.md](DEPLOY.md).
+The rebuild is deployed on Vercel. The previous build is still running on
+Railway at
+[demo-code-search-production.up.railway.app](https://demo-code-search-production.up.railway.app),
+untouched, reading its own collections, so the two can be compared side by side.
 
-## Prerequisites
+`code-search.qdrant.tech` currently answers 404 and is not serving either of
+them.
 
-To run this demo on your own system, install and/or set up the following components:
+## Why This Was Rebuilt
 
-- [Docker](https://www.docker.com/)
-- [Docker Compose](https://docs.docker.com/compose/)
-- [Rust](https://www.rust-lang.org/learn/get-started)
-- [rust-analyzer](https://rust-analyzer.github.io/)
+The previous build needed three services to answer a search:
 
-Docker and Docker Compose setup depends on your operating system. Please refer to the official documentation for
-instructions on how to install them. Both Rust and rust-analyzer can be installed with the following commands:
+- **Vercel** served the frontend.
+- **Railway** ran a FastAPI container that held `torch`, `transformers`,
+  `sentence-transformers` and two models in memory, because the backend had to
+  turn the query into a vector before it could ask Qdrant anything.
+- **Qdrant Cloud** stored the vectors.
 
-```shell
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup component add rust-analyzer
-```
+Railway existed only for that middle step. Qdrant Cloud Inference does the
+embedding inside the cluster, so the query goes out as text and comes back as
+ranked results. That leaves nothing for the container to do, and the backend
+collapses into three small TypeScript functions that post JSON and can sit in
+the same Vercel project as the frontend.
 
-## Description
+Two vendors, one deployment, two environment variables.
 
-You can set up [Qdrant](https://qdrant.tech) to help developers find the code they need, with context. Using semantic
-search, developers can find the code samples that can help them do their day-to-day work, even with:
+![Architecture](images/architecture.svg)
 
-- Imprecise keywords
-- Inexact names for functions, classes or variables
-- Some other code snippets
+### The Catch, and What It Cost
 
-The demo uses [Qdrant source code](https://github.com/qdrant/qdrant) to build an end-to-end code search application that
-helps you find the right piece of code, even if you have never contributed to the project. We implemented an end-to-end
-process, including data chunking, indexing, and search. Code search is a very specific task in which the programming 
-language syntax matters as much as the function, class, variable names, and the docstring, describing what and why. 
-While the latter is more of a traditional natural language processing task, the former requires a specific approach. 
-Thus, we use the following neural encoders for our use cases:
+`microsoft/unixcoder-base` is not in the Qdrant Cloud Inference catalog and cannot be
+added to it. External models are reachable by prefix (`openai/`, `cohere/`,
+`jinaai/`, `openrouter/`) but each one needs its own API key passed per request,
+which is a third vendor by another name. So consolidating **forced replacing the
+encoder**, and that made the model choice the whole migration rather than a
+detail of it.
 
-- `all-MiniLM-L6-v2` - one of the gold standard models for natural language processing
-- `microsoft/unixcoder-base` - a model trained specifically on a code dataset
+The replacement was picked by measurement, not by preference. See
+[Benchmarks](#benchmarks).
 
-### Chunking and indexing process
+### What This Gives Up
 
-Semantic search works best with _structured_ source code repositories, with good syntax, as well as best practices
-as defined by the authoring team. If your code base needs help, start by dividing the code into chunks. Each
-chunk should correspond to a specific function, struct, enum, or any other code structure that might be considered as a whole.
+**You can no longer run the whole demo locally.** Qdrant Cloud Inference is a Qdrant
+Cloud feature, so `docker run qdrant/qdrant` will not serve the models and the
+collections cannot be built against a local instance. The previous build ran end
+to end on a laptop with no accounts at all. This one needs a cluster, and the
+free tier is what that costs.
 
-There is a separate model-specific logic that extracts the most important parts of the code and converts them
-into a format that the neural network can understand. Only then, the encoded representation is indexed in the Qdrant 
-collection, along with a JSON structure describing that snippet as a payload.
+`docker-compose.yaml`, the `Dockerfile` and `requirements.txt` are gone with it.
+Nothing replaced them, which is the point, but it does mean the offline path is
+gone too.
 
-To that end, we work with the following models. The combination is the "best of both worlds."
+## Architecture
 
-#### all-MiniLM-L6-v2
+- [`frontend/`](frontend): React app, unchanged from the previous build except
+  for the parts that named the old encoders.
+- [`api/`](api): three Vercel functions. No dependencies at runtime; the whole
+  API is `fetch` and JSON.
+- [`indexer/`](indexer): builds the collections. No model runtime, because the
+  cluster does the embedding.
+- [`bench/`](bench): the measurements behind every number on this page.
+  Stdlib-only, so anyone can re-run them.
 
-Before the encoding, code is divided into chunks, but contrary to the traditional NLP challenges, it contains not only
-the definition of the function or class but also the context in which appears. While doing code search it's important 
-to know where the function is defined, in which module, and in which file. This information is crucial to present the
-results to the user in a meaningful way.
+Three collections, the same three as before:
 
-For example, the `upsert` function from one of Qdrant's modules would be represented as the following structure:
+| Collection | Points | What it holds |
+|---|---|---|
+| `code-signatures-cloud` | 17,187 | function and struct signatures, textified into something close to English |
+| `code-snippets-cloud` | 123,257 | the code itself, chunked on folding ranges from rust-analyzer |
+| `code-files-cloud` | 1,720 | whole source files, no vectors, so results can be shown in context |
+
+A search queries the first two at once. The signature collection supplies the
+results; the snippet collection says which line ranges inside them the second
+search also picked out, and those get highlighted. The file collection is a
+filtered scroll, used when someone clicks into a result.
+
+### Chunking and Indexing
+
+Semantic search works best on structured source. Each chunk corresponds to a
+function, struct, enum, or another unit that makes sense on its own.
+
+For the signature collection, the code is turned into a text-like representation
+first, because a model trained on English does not read Rust. The `upsert`
+function from `inverted_index_ram.rs` is stored as this structure:
 
 ```json
 {
@@ -86,167 +110,381 @@ For example, the `upsert` function from one of Qdrant's modules would be represe
         "file_path": "lib/sparse/src/index/inverted_index/inverted_index_ram.rs",
         "file_name": "inverted_index_ram.rs",
         "struct_name": "InvertedIndexRam",
-        "snippet": "    /// Upsert a vector into the inverted index.\n    pub fn upsert(&mut self, id: PointOffsetType, vector: SparseVector) {\n        for (dim_id, weight) in vector.indices.into_iter().zip(vector.values.into_iter()) {\n            let dim_id = dim_id as usize;\n            match self.postings.get_mut(dim_id) {\n                Some(posting) => {\n                    // update existing posting list\n                    let posting_element = PostingElement::new(id, weight);\n                    posting.upsert(posting_element);\n                }\n                None => {\n                    // resize postings vector (fill gaps with empty posting lists)\n                    self.postings.resize_with(dim_id + 1, PostingList::default);\n                    // initialize new posting for dimension\n                    self.postings[dim_id] = PostingList::new_one(id, weight);\n                }\n            }\n        }\n        // given that there are no holes in the internal ids and that we are not deleting from the index\n        // we can just use the id as a proxy the count\n        self.vector_count = max(self.vector_count, id as usize);\n    }\n"
+        "snippet": "    /// Upsert a vector into the inverted index.\n    pub fn upsert(&mut self, id: PointOffsetType, vector: SparseVector) { ... }"
     }
 }
 ```
 
-> Please note that this project aims to create a search mechanism specifically for Qdrant source code written in Rust.
-Thus, we built a small separate [rust-parser project](https://github.com/qdrant/rust-parser) that converts it into the 
-before-mentioned JSON objects. It uses [Syn](https://docs.rs/syn/latest/syn/index.html) to read the syntax tree of the 
-codebase. If you want to replicate the project for a different programming language, you will need to build a similar 
-parser for that language. For example, Python has a similar library called [ast](https://docs.python.org/3/library/ast.html), 
-but there might be some differences in the way the code is parsed, thus some adjustments might be required.
+and embedded as this sentence:
 
-Since the `all-MiniLM-L6-v2` model is trained for more natural language tasks, it won't be able to understand the
-code directly. For that reason, **we build a fake text-like representation of the structure, that should be 
-understandable for the model**, or its tokenizer to be more specific. Such representation won't contain the actual code, 
-but rather the important parts of it, like the function name, its signature, and the docstring, but also many more. All 
-the special, language-specific characters are removed, to keep the names and signatures as clean as possible. Only that
-representation is then passed to the model.
-
-For example, the `upsert` function from the example above would be represented as:
-
-```python
-'Function upsert that does: = " Upsert a vector into the inverted index." defined as fn upsert mut self id Point Offset Type vector Sparse Vector  in struct InvertedIndexRam  in module inverted_index  in file inverted_index_ram.rs'
+```text
+Function upsert that does: = " Upsert a vector into the inverted index." defined as
+fn upsert mut self id Point Offset Type vector Sparse Vector in struct InvertedIndexRam
+in module inverted_index in file inverted_index_ram.rs
 ```
 
-In the properly structured codebase, both module and file names should carry some additional information about the 
-semantics of that piece of code. For example, the `upsert` function is defined in the `InvertedIndexRam` struct, which 
-is a part of the `inverted_index`, which indicates that it is a part of the inverted index implementation stored in 
-memory. It is unclear from the function name itself.
+Module and file names carry real information in a well-organised codebase. That
+`upsert` belongs to `InvertedIndexRam` in `inverted_index` says it is the
+in-memory inverted index, which the function name alone does not. The conversion
+is `textify` in [`indexer/textifier.py`](indexer/textifier.py).
 
-> If you want to see how the conversion is implemented in general, please check the `textify` function in the 
-`code_search.index.textifier` module.
+Extracting the structures needs a parser per language. Rust uses the
+[rust-parser](https://github.com/qdrant/rust-parser) project, built on
+[syn](https://docs.rs/syn/latest/syn/index.html). Snippet boundaries come from
+rust-analyzer's [LSIF](https://microsoft.github.io/language-server-protocol/specifications/lsif/0.4.0/specification/)
+output, which is language-agnostic. Any language with an
+[LSP implementation](https://microsoft.github.io/language-server-protocol/implementors/servers/)
+can be chunked the same way.
 
-#### microsoft/unixcoder-base
+### Search
 
-In that case, the model focuses specifically on the code snippets. We take the definitions along with the corresponding 
-docstrings and pass them to the model. Extracting all the definitions is not a trivial task, but there are various 
-Language Server Protocol (**LSP**) implementations that can help with that, and you should be able to [find one for
-your programming language](https://microsoft.github.io/language-server-protocol/implementors/servers/). For Rust, we 
-used the [rust-analyzer](https://rust-analyzer.github.io/) that is capable of converting the codebase into the [LSIF 
-format](https://microsoft.github.io/language-server-protocol/specifications/lsif/0.4.0/specification/), which is a 
-universal, JSON-based format for code, regardless of the programming language.
+Both collections are hybrid: a dense vector and a sparse one per point, both
+produced by models running inside the cluster.
 
-The same `upsert` function from the example above would be represented in LSIF as multiple entries and won't contain
-the definition itself but just the location, so we have to extract it from the source file on our own. 
-
-Even though the `microsoft/unixcoder-base` model does not officially support Rust, we found it to be working quite well 
-for the task. Obtaining the embeddings for the code snippets is quite straightforward, as we just send the code snippet 
-directly to the model:
-
-```rust
-/// Upsert a vector into the inverted index.
-pub fn upsert(&mut self, id: PointOffsetType, vector: SparseVector) {
-    for (dim_id, weight) in vector.indices.into_iter().zip(vector.values.into_iter()) {
-        let dim_id = dim_id as usize;
-        match self.postings.get_mut(dim_id) {
-            Some(posting) => {
-                // update existing posting list
-                let posting_element = PostingElement::new(id, weight);
-                posting.upsert(posting_element);
-            }
-            None => {
-                // resize postings vector (fill gaps with empty posting lists)
-                self.postings.resize_with(dim_id + 1, PostingList::default);
-                // initialize new posting for dimension
-                self.postings[dim_id] = PostingList::new_one(id, weight);
-            }
-        }
-    }
-    // given that there are no holes in the internal ids and that we are not deleting from the index
-    // we can just use the id as a proxy the count
-    self.vector_count = max(self.vector_count, id as usize);
+```jsonc
+{
+  "prefetch": [
+    { "query": { "text": "cardinality of should request",
+                 "model": "sentence-transformers/all-MiniLM-L6-v2" },
+      "using": "dense",  "limit": 100 },
+    { "query": { "text": "cardinality of should request",
+                 "model": "Qdrant/bm25" },
+      "using": "sparse", "limit": 100 }
+  ],
+  "query": { "fusion": "rrf" },
+  "limit": 5
 }
 ```
 
-Having both encoders should help us build a more robust search mechanism, that can handle both the natural language and 
-code-specific queries.
+One round trip. The cluster embeds the query with both models, runs both
+searches, fuses them with
+[reciprocal rank fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)
+(Cormack, Clarke and Buettcher, 2009), and returns five results. The client
+sends a string.
 
-### Search process
+Nothing here is a new technique. Dense and sparse retrieval fused with RRF is a
+standard hybrid setup, and Qdrant implements the fusion. What this repository
+contributes is the measurement: which of the ten configurations actually wins on
+code, and by how much.
 
-The search process is quite straightforward. The user input is passed to both encoders, and the resulting vectors are
-used to query both Qdrant collections at the same time. The results are then merged with duplicates removed and returned 
-back to the user. 
+Why both legs: dense retrieval and BM25 fail on opposite queries, and the
+benchmark below shows exactly where. Someone searching `estimate_cardinality`
+wants the lexical match. Someone searching "how does it guess how many points
+come back" needs the dense one. Fusing costs one extra prefetch and no extra
+round trip.
 
-## Architecture
+BM25 is worth a separate note: Qdrant computes it in-engine from collection
+statistics, so unlike every other model in the catalog it bills **no inference
+tokens**. The sparse half of every query here is free.
 
-The demo uses [FastAPI](https://fastapi.tiangolo.com/) framework for the backend and [React](https://reactjs.org/) for 
-the frontend layer. 
+## Benchmarks
 
-![Architecture of the code search demo](images/architecture-diagram.png)
+Every number here came out of [`bench/`](bench) and can be re-run. Nothing is
+quoted from a model card.
 
-The demo consists of the following components:
-- [React frontend](/frontend) - a web application that allows the user to search over Qdrant codebase
-- [FastAPI backend](/code_search/service.py) - a backend that communicates with Qdrant and exposes a REST API
-- [Qdrant](https://qdrant.tech/) - a vector search engine that stores the data and performs the search
-- Two neural encoders - one trained on the natural language and one for the code-specific tasks
+### Picking the Encoder
 
-The diagram shows two collections. There are three: `code-signatures` for the
-MiniLM vectors, `code-snippets-unixcoder` for the UniXcoder vectors, and
-`code-files` holding the source of every indexed file so results can be shown in
-context.
+`bench/bakeoff.py` indexes 5,000 chunks of `qdrant/qdrant` into one collection
+with four vectors per point, then scores ten retrieval configurations through
+the real production path: the cluster embeds the query, the cluster searches,
+the cluster fuses.
 
-There is also an additional indexing component that has to be run periodically to keep the index up to date. It is also
-part of the demo, but it is not directly exposed to the user. All the required scripts are documented below, and you can 
-find them in the [`tools`](/tools) directory.
+Two query sets, because they disagree, and the disagreement is the finding:
 
-The demo is, as always, open source, so feel free to check the code in this repository to see how it is implemented.
+- **docstring**: 300 docstrings lifted from the code they describe, so they
+  share identifiers with the answer.
+- **paraphrase**: 113 of the same intents rewritten to avoid those
+  identifiers. Closer to what a person types.
 
-## Usage
+| configuration | doc R@1 | doc R@10 | doc MRR | par R@1 | par R@10 | par MRR | p50 ms |
+|---|---|---|---|---|---|---|---|
+| minilm only | 0.613 | 0.863 | 0.694 | 0.071 | 0.327 | 0.137 | 53 |
+| mxbai only | 0.817 | 0.973 | 0.876 | 0.106 | 0.381 | 0.175 | 112 |
+| bm25 only | 0.893 | 0.993 | 0.932 | 0.035 | 0.142 | 0.068 | 32 |
+| splade only | 0.903 | 0.993 | 0.935 | 0.035 | 0.133 | 0.068 | 110 |
+| minilm + bm25 (RRF) | 0.787 | 0.983 | 0.870 | 0.071 | 0.283 | 0.134 | 56 |
+| minilm + splade (RRF) | 0.787 | 0.983 | 0.870 | 0.088 | 0.292 | 0.144 | 113 |
+| mxbai + bm25 (RRF) | 0.877 | 0.993 | 0.924 | 0.133 | 0.336 | 0.178 | 116 |
+| mxbai + splade (RRF) | 0.877 | 1.000 | 0.925 | 0.124 | 0.336 | 0.171 | 118 |
+| minilm + bm25 (DBSF) | 0.843 | 0.980 | 0.896 | 0.097 | 0.239 | 0.140 | 56 |
+| mxbai + bm25 (DBSF) | 0.897 | 0.990 | 0.932 | 0.133 | 0.292 | 0.167 | 119 |
 
-As every other semantic search system, the demo requires a few steps to be set up. First of all, the data has to be
-ingested, so we can then use the created index for our queries.
+5,000 candidates, one correct answer each, 100 candidates per leg before
+fusion. p50 is the Qdrant round trip from a laptop in the same country as the
+cluster, over a kept-alive connection.
 
-### Data indexing
+What it says:
 
-Qdrant is used as a search engine, so you will need to have it running somewhere. You can either use the local container
-or the Cloud version. If you want to use the local version, you can start it with the following command:
+**Lexical search wins the docstring set and loses the paraphrase set, badly.**
+BM25 alone gets 0.993 recall@10 when the query shares identifiers with the
+answer, and 0.142 when it does not. Any benchmark built only from docstrings
+would conclude that the dense leg is dead weight. It would be wrong about every
+query a visitor actually types.
+
+**SPLADE never earns its cost.** It ties BM25 on the docstring set, loses on
+the paraphrase set, runs three times slower, and bills inference tokens where
+BM25 bills none. BM25 is computed in-engine from collection statistics, so the
+sparse half of this system is free at any corpus size.
+
+**DBSF was tried and rejected.** Reciprocal rank fusion gives each leg half a
+vote by position, which looked wasteful on paraphrase queries where the lexical
+leg contributes noise. Distribution-based fusion should have let a confident
+dense score outvote a weak lexical one. It did the opposite: it lets a
+confident *lexical* score dominate, and on paraphrases BM25 is confidently
+wrong. Paraphrase recall@10 fell from 0.336 to 0.292.
+
+### A Model Served Differently Than Its Model Card
+
+The in-cluster `all-MiniLM-L6-v2` scores 0.863 docstring recall@10 here. An
+offline run of the same model, on the same 5,000 documents and the same 300
+queries, scored 0.933.
+
+Probing the service with progressively longer input shows it truncates at
+**512 tokens**. The published `sentence-transformers` configuration for this
+model sets `max_seq_length` to **256**. It was trained at that length, and
+positions beyond it are ones it barely saw. 36% of this corpus is longer than
+256 tokens, so more than a third of it was being embedded with positions the
+model was never trained on.
+
+`bench/truncation.py` indexes the corpus again with every document cut to 700
+characters, roughly 256 tokens of Rust, and scores it the same way.
+
+| input | doc R@10 | doc MRR | par R@10 | par MRR |
+|---|---|---|---|---|
+| minilm, full text | 0.863 | 0.694 | 0.327 | 0.137 |
+| minilm, cut to ~256 tokens | 0.937 | 0.791 | 0.310 | 0.167 |
+| minilm + bm25, full text | 0.983 | 0.870 | 0.283 | 0.134 |
+| minilm + bm25, cut | 0.983 | 0.913 | 0.319 | 0.126 |
+
+Cutting the input takes MiniLM from 0.863 to 0.937 docstring recall@10, which is
+the 0.933 the offline run got. The window is the cause.
+
+Two things follow. Anyone using `all-MiniLM-L6-v2` through Qdrant Cloud Inference on
+documents longer than 256 tokens is losing recall and has no way to see it from
+the API. And for this demo it is moot, because `mxbai-embed-large-v1` has a
+native 512-token limit, so the service's window is the model's window and there
+is nothing to cut. [`indexer/build.py`](indexer/build.py) still carries an
+`INDEX_CHAR_BUDGET` for anyone who switches back to a 256-token model; it
+defaults to 0.
+
+### Why mxbai and Not the Free Model
+
+| | mxbai + bm25 | minilm + bm25 (cut) |
+|---|---|---|
+| docstring recall@10 | **0.993** | 0.983 |
+| docstring MRR | **0.924** | 0.913 |
+| paraphrase recall@10 | **0.336** | 0.319 |
+| paraphrase MRR | **0.178** | 0.126 |
+| paraphrase recall@1 | **0.133** | 0.035 |
+| p50 | 116 ms | **54 ms** |
+| dimensions | 1024 | **384** |
+| tokens to index 140k points | 65.4 M | **0**, MiniLM is free |
+
+On docstring queries these are close enough that either would do. They separate
+on the paraphrase set, and that is the set that matters: a visitor types a
+description, not a docstring. mxbai puts the right function first for 13.3% of
+those queries against MiniLM's 3.5%. The demo is judged on the first result, so
+it pays for the model.
+
+Reproduce the whole comparison with `python bench/bakeoff.py` and
+`python bench/truncation.py`.
+
+### What a Full Index Costs
+
+The index that is deployed was built in one run, and the cluster reports what it
+charged, so these are measured rather than projected.
+
+| collection | points | wall clock | mxbai tokens |
+|---|---|---|---|
+| `code-files-cloud` | 1,720 | 4 s | 0, it holds no vectors |
+| `code-signatures-cloud` | 17,187 | 3.4 min | 2,262,210 |
+| `code-snippets-cloud` | 123,257 | 22.3 min | 28,164,640 |
+| **total** | **142,164** | **~26 min** | **30,426,850** |
+
+BM25 appears nowhere in that column. The engine derives it from collection
+statistics, so the sparse half of the index cost nothing and will keep costing
+nothing however far the corpus grows.
+
+`bench/index_cost.py` estimates this ahead of a run by embedding a uniform
+sample and multiplying. It predicted 65.4M against the 30.4M actually charged,
+and the gap is instructive: it sampled the evaluation corpus, whose text field
+is a signature and its snippet concatenated, while the deployed collections
+embed each of those separately. Sample the thing you are going to embed, not
+something shaped like it.
+
+Per-model prices live on the Inference tab of the cluster page in the Cloud
+Console and are deliberately not copied here, because a stale price in a
+repository is worse than no price. A full rebuild is a one-off in any case.
+Answering a search costs 36 to 46 tokens, measured on the deployed demo: the
+query is embedded once per collection, and the two BM25 legs cost nothing. The
+`/api/search` response carries the figure as `inference_tokens` so it stays
+checkable rather than asserted.
+
+### Against the Demo It Replaces
+
+Both deployments answered the same 413 queries over the same 123k corpus on the
+same day, five results each, scored by `bench/quality.py`.
+
+| | R@1 | R@5 | file R@5 | MRR |
+|---|---|---|---|---|
+| **rebuild**, docstring | **0.887** | **0.983** | **0.983** | **0.930** |
+| old demo, docstring | 0.567 | 0.907 | 0.913 | 0.713 |
+| **rebuild**, paraphrase | 0.097 | 0.177 | 0.257 | 0.127 |
+| old demo, paraphrase | 0.106 | 0.195 | 0.257 | 0.142 |
+
+The paraphrase row looks like a small regression and is not one.
+`bench/significance.py` compares the two rankings query by query with a paired
+bootstrap and an exact sign test, because a 0.015 gap across 113 queries is well
+inside what four queries landing differently can produce:
+
+| comparison | MRR difference | 95% interval | sign test |
+|---|---|---|---|
+| docstring | **+0.125** | [+0.091, +0.161] | p < 0.001, 66 better / 11 worse |
+| paraphrase | −0.012 | [−0.074, +0.051] | p = 0.44, 11 better / 16 worse |
+
+The docstring gain is real and large. The paraphrase difference cannot be
+distinguished from zero on this many queries, so the honest claim is a decisive
+win on one set and a draw on the other, not a trade.
+
+The sparse leg was checked the same way rather than assumed. Against dense
+alone it is worth +0.041 MRR on docstring queries, interval [+0.020, +0.062],
+p = 0.001. On paraphrase queries dense alone wins more queries than it loses,
+16 to 3, but the MRR interval straddles zero. So BM25 earns its place on the
+evidence that exists, and the case against it does not.
+
+### Where This Stops Working
+
+Four boundaries, all of them visible in the numbers above.
+
+**Vague natural language still mostly fails.** Paraphrase recall@5 is 0.177. A
+visitor who types "how does it decide what to keep in memory" will usually not
+get the right function in five results, from this build or the one it replaces.
+The docstring numbers are the flattering ones and they are flattering because
+those queries share identifiers with their answers.
+
+**One repository, one language.** Chunking depends on rust-analyzer for snippet
+boundaries and on `qdrant/rust-parser` for signatures. Another language needs
+its own parser and an LSP that emits LSIF. Nothing above transfers untested.
+
+**142k points on one cluster.** Everything here was measured at that size. RRF
+behavior and the prefetch of 100 per leg were not tuned for a corpus an order
+of magnitude larger, and the sparse leg's advantage is a property of this
+corpus's identifier vocabulary rather than a general result.
+
+**The index is a snapshot.** Results resolve against one commit of
+`qdrant/qdrant`. The moment that branch moves, line numbers drift, and nothing
+in the running demo notices. `INDEXED_COMMIT` is the seam.
+
+### A Ranking Bug, Inherited
+
+The first head-to-head scored the rebuild at 0.620 docstring recall@1 while the
+signature search underneath it was returning the right function first 88.7% of
+the time. The merge step was throwing that away.
+
+`merge_search_results` sorted results by how many overlapping snippet ranges
+each one had, on the theory that results both searches agreed on should come
+first. In practice a result with two highlighted line ranges was promoted over
+the actual best match with none. Removing the re-sort moved docstring recall@1
+from 0.620 to 0.887 and MRR from 0.768 to 0.930, and changed nothing else:
+overlap still decides which lines are highlighted.
+
+This was inherited, not introduced. Measured directly, the old demo's own
+signature search scores 0.730 recall@1, while the deployment built on top of it
+returns 0.567. Same re-sort, same cost, and it has been there the whole time.
+
+### Latency
+
+Both deployments, 60 searches each, from the same machine over a kept-alive
+connection, queries varied so nothing is answered from a cache.
+
+| | first request | p50 | p95 | server p50 |
+|---|---|---|---|---|
+| **rebuild** | 495 ms | **148.8 ms** | 233.2 ms | 91 ms |
+| old demo | 438 ms | 176.7 ms | **188.2 ms** | **81 ms** |
+
+`server` is what the function reports it spent talking to Qdrant, so the gap
+between it and end-to-end is the platform and the network.
+
+The rebuild is faster at the median and slower at the p95. That tail is the
+honest cost of serverless: a container that is always warm has a flatter
+distribution than functions that are not. The first request is comparable, which
+surprises people who expect a cold start to dominate. There is no model to load
+any more, so there is nothing to be cold about.
+
+**Where the tail comes from.** Measured directly against Qdrant, the BM25 leg
+answers in 32.0 ms p50 and 33.4 ms p95, a spread of 1.4 ms. The mxbai leg
+answers in 110.9 ms p50 and 156.9 ms p95, a spread of 46.0 ms. The function's
+whole server-side spread is 54 ms, so 46 of it is the dense model's inference
+call and the platform contributes about eight. The old demo ran a smaller model
+in-process on a warm container, which is why its distribution is nearly flat at
+80 ms p50 and 84 ms p95. That determinism is what was traded for a model that
+finds the right function 56% more often.
+
+**Repeated queries are free.** The three example queries on the landing page get
+clicked far more than anything anyone types, and Qdrant Cloud Inference re-embeds
+every request: an identical query costs the same 117 ms as a novel one. So the
+function keeps a small bounded cache of whole responses, which skips the
+embedding and the search together. On traffic where the examples dominate, p50
+falls to 52.9 ms, most of which is the network rather than the demo. On the
+benchmark above, where every query is deliberately different, it changes nothing.
+
+The old backend cached the query vector instead. That option is gone: the
+cluster embeds and never returns the vector, so there is nothing of that shape
+to keep. Caching the answer is strictly more of the work, and it is only safe
+because the index is a snapshot rebuilt by an explicit run rather than updated
+underneath the reader.
+
+**Region pinning is doing most of the work here.** The cluster is in AWS
+us-west-2 and Vercel defaults functions to iad1 in Virginia, so every search
+crossed the country and back, twice, once per collection. Before pinning to
+pdx1, the same benchmark reported 273.8 ms p50 and 163 ms server. One line in
+[vercel.json](vercel.json) took the median from 273.8 ms to 148.8 ms. Anyone
+deploying this against a cluster in another region should change that line
+first, and the health endpoint will not tell them: a cross-region deployment is
+perfectly healthy and quietly twice as slow.
+
+## Running It Yourself
+
+See [DEPLOY.md](DEPLOY.md). Short version: create a Qdrant Cloud cluster with
+inference enabled, build the index, import this repo into Vercel, set
+`QDRANT_URL` and `QDRANT_API_KEY`.
+
+### Prerequisites for Building the Index From Source
+
+- **Qdrant 1.10 or newer**, with Qdrant Cloud Inference enabled. The two-leg
+  `prefetch` plus `fusion` query needs 1.10; inference is what embeds the query.
+- [Rust](https://www.rust-lang.org/learn/get-started) and
+  [rust-analyzer](https://rust-analyzer.github.io/) for snippet boundaries
+- [Docker](https://www.docker.com/) for the rust-parser container
 
 ```shell
-docker run -p 6333:6333 -p 6334:6334 \
-    -v $(pwd)/qdrant_storage:/qdrant/storage:z \
-    qdrant/qdrant
-```
-
-However, the easiest way to start using Qdrant is to use our Cloud version. You can sign up for a free tier 1GB cluster 
-at [https://cloud.qdrant.io/](https://cloud.qdrant.io/).
-
-Once the environment is set up, you can configure the Qdrant instance and build the index by running the following 
-commands:
-
-```shell
-export QDRANT_URL="http://localhost:6333"
-
-# For the Cloud service you need to specify the api key as well
-# export QDRANT_API_KEY="your-api-key"
-
+rustup component add rust-analyzer
+export QDRANT_URL="https://your-cluster-id.region.aws.cloud.qdrant.io:6333"
+export QDRANT_API_KEY="..."
 bash tools/download_and_index.sh
 ```
 
-The indexing process might take a while, as it needs to encode all the code snippets and send them to the Qdrant.
+Nothing in that list is a Python model dependency, and there is no
+`requirements.txt`. The indexer is stdlib.
 
-### Search service
-
-Once the index is built, you can start the search service by running the following commands:
+### Local Development
 
 ```shell
-docker-compose up
+cp .env.example .env.local     # QDRANT_URL and QDRANT_API_KEY
+npm install
+npx vercel dev
 ```
 
-The UI will be available at [http://localhost:8000/](http://localhost:8000/), serving both the
-frontend and the API from the same container. For a running instance, see the
-[live demo](https://demo-code-search-production.up.railway.app).
+http://127.0.0.1:3000 serves the app and the API together, the same way
+production does.
 
-You can type in the search query and see the related code structures. Queries might come both from natural language
-but also from the code itself. 
+## Further Steps
 
-## Further steps
-
-If you would like to take the demo further, you can try to:
-
-1. Disable one of the neural encoders and see how the search results change.
-2. Try out some other encoder models and see the impact on the search quality.
-3. Fork the project and support programming languages other than Rust.
-4. Build a ground truth dataset and evaluate the search quality.
+1. Turn off one leg of the hybrid query and watch which queries break. The
+   paraphrase set below is the interesting half.
+2. Swap the dense model. `bench/bakeoff.py` scores a new one against the same
+   corpus in one command.
+3. Fork it for a language other than Rust. The chunking is the only part that
+   is Rust-specific.
+4. Build a ground truth set for your own codebase and re-run `bench/quality.py`
+   against it. Every claim on this page came out of that script.

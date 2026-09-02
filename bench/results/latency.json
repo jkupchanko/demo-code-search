@@ -1,0 +1,36 @@
+[
+  {
+    "target": "https://demo-code-search-cloud.vercel.app",
+    "requests": 60,
+    "errors": 0,
+    "first_request_ms": 775,
+    "end_to_end": {
+      "p50": 147.8,
+      "p95": 205.0,
+      "mean": 159.0
+    },
+    "inference_tokens_total": 2260,
+    "server": {
+      "p50": 91.0,
+      "p95": 145.0
+    },
+    "overhead_p50": 56.8
+  },
+  {
+    "target": "https://demo-code-search-production.up.railway.app",
+    "requests": 60,
+    "errors": 0,
+    "first_request_ms": 2033,
+    "end_to_end": {
+      "p50": 178.0,
+      "p95": 186.3,
+      "mean": 178.0
+    },
+    "inference_tokens_total": 0,
+    "server": {
+      "p50": 80.0,
+      "p95": 84.0
+    },
+    "overhead_p50": 98.0
+  }
+]
