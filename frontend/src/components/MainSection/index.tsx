@@ -8,7 +8,7 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { getHotkeyHandler, useHotkeys } from "@mantine/hooks";
+import { useHotkeys } from "@mantine/hooks";
 import {
   IconAlertTriangle,
   IconBolt,
@@ -158,7 +158,13 @@ export default function Main() {
           rightSectionWidth="6rem"
           value={query}
           onChange={handleChange}
-          onKeyDown={getHotkeyHandler([["Enter", () => runSearch(query)]])}
+          // A plain handler rather than Mantine's getHotkeyHandler, which
+          // builds its handler during render and closes over runSearch,
+          // which touches a ref. Identical behaviour for a single
+          // unmodified key.
+          onKeyDown={(event) => {
+            if (event.key === "Enter") runSearch(query);
+          }}
           classNames={{ input: classes.input }}
           autoFocus
         />
