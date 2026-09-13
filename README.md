@@ -11,13 +11,13 @@ The interface is the same. What changed is everything behind it, and
 
 ## Online Version
 
-The rebuild is deployed on Vercel. The previous build is still running on
-Railway at
-[demo-code-search-production.up.railway.app](https://demo-code-search-production.up.railway.app),
-untouched, reading its own collections, so the two can be compared side by side.
+Live at
+[code-search.qdrant.tech](https://code-search.qdrant.tech).
 
-`code-search.qdrant.tech` currently answers 404 and is not serving either of
-them.
+The previous build is still running on
+[demo-code-search-production.up.railway.app](https://demo-code-search-production.up.railway.app),
+untouched and reading its own collections, so the two can be compared side by
+side while the numbers below are checked.
 
 ## Why This Was Rebuilt
 
