@@ -1,0 +1,216 @@
+{
+  "corpus_size": 5000,
+  "prefetch_per_leg": 100,
+  "rows": [
+    {
+      "config": "minilm only",
+      "docstring": {
+        "recall@1": 0.6133,
+        "recall@5": 0.8067,
+        "recall@10": 0.8633,
+        "mrr@10": 0.6935,
+        "p50_ms": 53.1,
+        "p95_ms": 176.0,
+        "tokens": 4415
+      },
+      "paraphrase": {
+        "recall@1": 0.0708,
+        "recall@5": 0.2124,
+        "recall@10": 0.3274,
+        "mrr@10": 0.1372,
+        "p50_ms": 53.0,
+        "p95_ms": 205.0,
+        "tokens": 1366
+      }
+    },
+    {
+      "config": "mxbai only",
+      "docstring": {
+        "recall@1": 0.8167,
+        "recall@5": 0.9467,
+        "recall@10": 0.9733,
+        "mrr@10": 0.8759,
+        "p50_ms": 112.1,
+        "p95_ms": 124.8,
+        "tokens": 7415
+      },
+      "paraphrase": {
+        "recall@1": 0.1062,
+        "recall@5": 0.2655,
+        "recall@10": 0.3805,
+        "mrr@10": 0.1754,
+        "p50_ms": 111.4,
+        "p95_ms": 116.3,
+        "tokens": 2496
+      }
+    },
+    {
+      "config": "bm25 only",
+      "docstring": {
+        "recall@1": 0.8933,
+        "recall@5": 0.9733,
+        "recall@10": 0.9933,
+        "mrr@10": 0.9318,
+        "p50_ms": 32.0,
+        "p95_ms": 34.2,
+        "tokens": 0
+      },
+      "paraphrase": {
+        "recall@1": 0.0354,
+        "recall@5": 0.1239,
+        "recall@10": 0.1416,
+        "mrr@10": 0.0683,
+        "p50_ms": 31.9,
+        "p95_ms": 33.0,
+        "tokens": 0
+      }
+    },
+    {
+      "config": "splade only",
+      "docstring": {
+        "recall@1": 0.9033,
+        "recall@5": 0.9733,
+        "recall@10": 0.9933,
+        "mrr@10": 0.9347,
+        "p50_ms": 110.1,
+        "p95_ms": 141.3,
+        "tokens": 5015
+      },
+      "paraphrase": {
+        "recall@1": 0.0354,
+        "recall@5": 0.1239,
+        "recall@10": 0.1327,
+        "mrr@10": 0.068,
+        "p50_ms": 108.0,
+        "p95_ms": 118.1,
+        "tokens": 1592
+      }
+    },
+    {
+      "config": "minilm + bm25 (RRF)",
+      "docstring": {
+        "recall@1": 0.7867,
+        "recall@5": 0.9633,
+        "recall@10": 0.9833,
+        "mrr@10": 0.87,
+        "p50_ms": 55.5,
+        "p95_ms": 235.4,
+        "tokens": 4415
+      },
+      "paraphrase": {
+        "recall@1": 0.0708,
+        "recall@5": 0.2389,
+        "recall@10": 0.2832,
+        "mrr@10": 0.1341,
+        "p50_ms": 55.5,
+        "p95_ms": 190.7,
+        "tokens": 1366
+      }
+    },
+    {
+      "config": "minilm + splade (RRF)",
+      "docstring": {
+        "recall@1": 0.7867,
+        "recall@5": 0.9567,
+        "recall@10": 0.9833,
+        "mrr@10": 0.87,
+        "p50_ms": 113.3,
+        "p95_ms": 312.0,
+        "tokens": 9430
+      },
+      "paraphrase": {
+        "recall@1": 0.0885,
+        "recall@5": 0.2212,
+        "recall@10": 0.292,
+        "mrr@10": 0.1437,
+        "p50_ms": 114.3,
+        "p95_ms": 257.0,
+        "tokens": 2958
+      }
+    },
+    {
+      "config": "mxbai + bm25 (RRF)",
+      "docstring": {
+        "recall@1": 0.8767,
+        "recall@5": 0.9733,
+        "recall@10": 0.9933,
+        "mrr@10": 0.9239,
+        "p50_ms": 116.5,
+        "p95_ms": 157.2,
+        "tokens": 7415
+      },
+      "paraphrase": {
+        "recall@1": 0.1327,
+        "recall@5": 0.2478,
+        "recall@10": 0.3363,
+        "mrr@10": 0.1778,
+        "p50_ms": 114.8,
+        "p95_ms": 120.9,
+        "tokens": 2496
+      }
+    },
+    {
+      "config": "mxbai + splade (RRF)",
+      "docstring": {
+        "recall@1": 0.8767,
+        "recall@5": 0.9867,
+        "recall@10": 1.0,
+        "mrr@10": 0.9252,
+        "p50_ms": 117.9,
+        "p95_ms": 164.3,
+        "tokens": 12430
+      },
+      "paraphrase": {
+        "recall@1": 0.1239,
+        "recall@5": 0.2301,
+        "recall@10": 0.3363,
+        "mrr@10": 0.1712,
+        "p50_ms": 118.9,
+        "p95_ms": 168.5,
+        "tokens": 4088
+      }
+    },
+    {
+      "config": "minilm + bm25 (DBSF)",
+      "docstring": {
+        "recall@1": 0.8433,
+        "recall@5": 0.9533,
+        "recall@10": 0.98,
+        "mrr@10": 0.8965,
+        "p50_ms": 56.3,
+        "p95_ms": 265.4,
+        "tokens": 4415
+      },
+      "paraphrase": {
+        "recall@1": 0.0973,
+        "recall@5": 0.1947,
+        "recall@10": 0.2389,
+        "mrr@10": 0.1396,
+        "p50_ms": 55.6,
+        "p95_ms": 155.3,
+        "tokens": 1366
+      }
+    },
+    {
+      "config": "mxbai + bm25 (DBSF)",
+      "docstring": {
+        "recall@1": 0.8967,
+        "recall@5": 0.9733,
+        "recall@10": 0.99,
+        "mrr@10": 0.9325,
+        "p50_ms": 118.6,
+        "p95_ms": 186.2,
+        "tokens": 7415
+      },
+      "paraphrase": {
+        "recall@1": 0.1327,
+        "recall@5": 0.2212,
+        "recall@10": 0.292,
+        "mrr@10": 0.1673,
+        "p50_ms": 117.2,
+        "p95_ms": 188.7,
+        "tokens": 2496
+      }
+    }
+  ]
+}

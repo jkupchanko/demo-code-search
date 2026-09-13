@@ -8,7 +8,7 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { getHotkeyHandler, useHotkeys } from "@mantine/hooks";
+import { useHotkeys } from "@mantine/hooks";
 import {
   IconAlertTriangle,
   IconBolt,
@@ -29,8 +29,8 @@ import classes from "./Main.module.css";
 const FEATURES = [
   {
     icon: IconVectorTriangle,
-    title: "Two Embedding Models",
-    text: "MiniLM reads natural language, UniXcoder reads code structure. Combined for better matches.",
+    title: "Dense and Sparse, Fused",
+    text: "mxbai reads natural language, BM25 matches exact identifiers. Combined for better matches.",
   },
   {
     icon: IconMessageSearch,
@@ -158,7 +158,13 @@ export default function Main() {
           rightSectionWidth="6rem"
           value={query}
           onChange={handleChange}
-          onKeyDown={getHotkeyHandler([["Enter", () => runSearch(query)]])}
+          // A plain handler rather than Mantine's getHotkeyHandler, which
+          // builds its handler during render and closes over runSearch,
+          // which touches a ref. Identical behaviour for a single
+          // unmodified key.
+          onKeyDown={(event) => {
+            if (event.key === "Enter") runSearch(query);
+          }}
           classNames={{ input: classes.input }}
           autoFocus
         />
@@ -175,15 +181,16 @@ export default function Main() {
             </Text>
             <span
               className={classes.modePill}
-              data-mode={data.mode ?? "semantic"}
+              data-mode="hybrid"
               title={
-                data.mode === "keyword"
-                  ? "Keyword ranking (unixcoder embeddings still building)"
-                  : "Semantic search via unixcoder + MiniLM"
+                data.models
+                  ? `Hybrid search via ${data.models.dense} + ${data.models.sparse}, ` +
+                    "fused with RRF by Qdrant Cloud Inference"
+                  : "Hybrid search via Qdrant Cloud Inference"
               }
             >
               <IconBolt size={12} stroke={2.2} />
-              {data.mode === "keyword" ? "Warming Up" : "Semantic"}
+              Hybrid
             </span>
           </Box>
           <Box className={classes.results}>
@@ -204,11 +211,11 @@ export default function Main() {
       )}
       {showHero && (
         <Box className={classes.hero}>
-          <Text className={classes.eyebrow}>Semantic Search Demo</Text>
+          <Text className={classes.eyebrow}>Hybrid Search Demo</Text>
           <Title order={1} className={classes.heading}>
             Search Code by <span className={classes.headingHighlight}>Meaning</span>,
             <br />
-            Not Keywords
+            and by Name
           </Title>
           <Text className={classes.subHeading}>
             Describe what code does. Find matching functions and snippets

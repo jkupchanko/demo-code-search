@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" width="900" height="420" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+  <title>Code search architecture: one Vercel deployment, one Qdrant Cloud cluster</title>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b93a7"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="420" fill="#0f1420"/>
+
+  <!-- viewer -->
+  <rect x="30" y="170" width="130" height="70" rx="10" fill="#1b2233" stroke="#39415a"/>
+  <text x="95" y="200" text-anchor="middle" fill="#e6e9f2" font-size="15" font-weight="600">Browser</text>
+  <text x="95" y="220" text-anchor="middle" fill="#8b93a7" font-size="12">one origin</text>
+
+  <!-- vercel -->
+  <rect x="210" y="70" width="270" height="280" rx="14" fill="#151b2b" stroke="#6047ff" stroke-width="1.5"/>
+  <text x="345" y="100" text-anchor="middle" fill="#b8adff" font-size="13" font-weight="700" letter-spacing="0.08em">VERCEL</text>
+  <text x="345" y="119" text-anchor="middle" fill="#8b93a7" font-size="11">one project, one deployment</text>
+
+  <rect x="235" y="140" width="220" height="60" rx="8" fill="#1b2233" stroke="#39415a"/>
+  <text x="345" y="164" text-anchor="middle" fill="#e6e9f2" font-size="13" font-weight="600">React app (static)</text>
+  <text x="345" y="183" text-anchor="middle" fill="#8b93a7" font-size="11">frontend/ — built by Vite</text>
+
+  <rect x="235" y="220" width="220" height="100" rx="8" fill="#1b2233" stroke="#39415a"/>
+  <text x="345" y="244" text-anchor="middle" fill="#e6e9f2" font-size="13" font-weight="600">API functions</text>
+  <text x="345" y="264" text-anchor="middle" fill="#8b93a7" font-size="11">api/search.ts · api/file.ts</text>
+  <text x="345" y="281" text-anchor="middle" fill="#8b93a7" font-size="11">api/health.ts</text>
+  <text x="345" y="303" text-anchor="middle" fill="#6d7488" font-size="10.5" font-style="italic">no model runtime, no dependencies</text>
+
+  <!-- qdrant cloud -->
+  <rect x="560" y="40" width="310" height="340" rx="14" fill="#151b2b" stroke="#dc244c" stroke-width="1.5"/>
+  <text x="715" y="70" text-anchor="middle" fill="#ff8098" font-size="13" font-weight="700" letter-spacing="0.08em">QDRANT CLOUD</text>
+  <text x="715" y="89" text-anchor="middle" fill="#8b93a7" font-size="11">one cluster</text>
+
+  <rect x="585" y="110" width="260" height="86" rx="8" fill="#1b2233" stroke="#39415a"/>
+  <text x="715" y="134" text-anchor="middle" fill="#e6e9f2" font-size="13" font-weight="600">Cloud Inference</text>
+  <text x="715" y="155" text-anchor="middle" fill="#8b93a7" font-size="11">mxbai-embed-large-v1 (dense, 1024d)</text>
+  <text x="715" y="173" text-anchor="middle" fill="#8b93a7" font-size="11">BM25 (sparse, computed in-engine)</text>
+  <text x="715" y="189" text-anchor="middle" fill="#6d7488" font-size="10.5" font-style="italic">query text in, vectors never leave</text>
+
+  <rect x="585" y="216" width="260" height="140" rx="8" fill="#1b2233" stroke="#39415a"/>
+  <text x="715" y="240" text-anchor="middle" fill="#e6e9f2" font-size="13" font-weight="600">Collections</text>
+  <text x="715" y="264" text-anchor="middle" fill="#8b93a7" font-size="11">code-signatures-cloud — 17k</text>
+  <text x="715" y="284" text-anchor="middle" fill="#8b93a7" font-size="11">code-snippets-cloud — 123k</text>
+  <text x="715" y="304" text-anchor="middle" fill="#8b93a7" font-size="11">code-files-cloud — 1.7k, no vectors</text>
+  <text x="715" y="330" text-anchor="middle" fill="#6d7488" font-size="10.5" font-style="italic">dense + sparse per point,</text>
+  <text x="715" y="345" text-anchor="middle" fill="#6d7488" font-size="10.5" font-style="italic">fused server-side with RRF</text>
+
+  <!-- edges -->
+  <line x1="160" y1="205" x2="205" y2="205" stroke="#8b93a7" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="480" y1="270" x2="555" y2="270" stroke="#8b93a7" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="518" y="260" text-anchor="middle" fill="#8b93a7" font-size="10">query text</text>
+  <line x1="555" y1="290" x2="480" y2="290" stroke="#8b93a7" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="518" y="307" text-anchor="middle" fill="#8b93a7" font-size="10">ranked hits</text>
+
+  <text x="450" y="400" text-anchor="middle" fill="#6d7488" font-size="11.5">Two vendors. The previous build had three: the middle box was a container on Railway holding torch, transformers and UniXcoder.</text>
+</svg>

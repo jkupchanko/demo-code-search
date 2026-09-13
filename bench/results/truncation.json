@@ -1,0 +1,37 @@
+{
+  "char_budget": 700,
+  "documents_shortened": 1801,
+  "mean_tokens_per_doc": 242.7,
+  "worst_batch_mean_tokens": 341.6,
+  "under_budget": false,
+  "sets": {
+    "dense/docstring": {
+      "recall@1": 0.72,
+      "recall@5": 0.8833,
+      "recall@10": 0.9367,
+      "mrr@10": 0.7911,
+      "p50_ms": 52.9
+    },
+    "dense/paraphrase": {
+      "recall@1": 0.1062,
+      "recall@5": 0.2389,
+      "recall@10": 0.3097,
+      "mrr@10": 0.1666,
+      "p50_ms": 53.0
+    },
+    "hybrid/docstring": {
+      "recall@1": 0.8667,
+      "recall@5": 0.9667,
+      "recall@10": 0.9833,
+      "mrr@10": 0.9133,
+      "p50_ms": 53.7
+    },
+    "hybrid/paraphrase": {
+      "recall@1": 0.0354,
+      "recall@5": 0.2478,
+      "recall@10": 0.3186,
+      "mrr@10": 0.1258,
+      "p50_ms": 54.8
+    }
+  }
+}

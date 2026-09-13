@@ -13,8 +13,11 @@ export default defineConfig({
   server: {
     port: Number(process.env.PORT) || 5173,
     proxy: {
+      // `vercel dev` runs the /api functions locally on 3000. Start it in
+      // another terminal, or just run `vercel dev` on its own - it serves the
+      // Vite app too.
       "/api": {
-        target: "http://0.0.0.0:8000",
+        target: "http://127.0.0.1:3000",
         changeOrigin: true,
       },
     },

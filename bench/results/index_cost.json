@@ -1,0 +1,25 @@
+{
+  "sampled": 320,
+  "corpus_size": 140444,
+  "batch_p50_ms": 991.2,
+  "models": {
+    "mixedbread-ai/mxbai-embed-large-v1": {
+      "tokens_per_doc": 466.1,
+      "projected_tokens": 65453926,
+      "projected_millions": 65.45
+    },
+    "prithivida/splade_pp_en_v1": {
+      "tokens_per_doc": 128.0,
+      "projected_tokens": 17976832,
+      "projected_millions": 17.98
+    },
+    "sentence-transformers/all-minilm-l6-v2": {
+      "tokens_per_doc": 459.4,
+      "projected_tokens": 64515585,
+      "projected_millions": 64.52
+    }
+  },
+  "free": [
+    "qdrant/bm25"
+  ]
+}
